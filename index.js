@@ -141,7 +141,7 @@ async function onPromptReady(eventData) {
     const external = await withTimeout(
       getPreciseExternalContext(),
       RULES.PROMPT_HANDLER_TIMEOUT_MS,
-      '读取上下文超时',
+      `读取上下文超时(${RULES.PROMPT_HANDLER_TIMEOUT_MS}ms)`,
     );
 
     const validated = validatePool(pool, { lastUser: userText, lastAi: aiText });
@@ -168,14 +168,19 @@ async function onPromptReady(eventData) {
         lastAi: aiText,
       };
 
-      const aiResult = await withTimeout(
-        generateEventsByAIWithStatus(source),
-        RULES.PROMPT_HANDLER_TIMEOUT_MS,
-        'AI生成超时',
-      );
-      if (!aiResult.ok && RULES.FAIL_OPEN_ON_AI_ERROR) {
-        recordFailOpen(`AI失败后跳过注入: ${aiResult.error}`);
-        return;
+      let aiResult = { ok: false, events: [], error: '未执行AI生成' };
+      try {
+        aiResult = await withTimeout(
+          generateEventsByAIWithStatus(source),
+          RULES.PROMPT_HANDLER_TIMEOUT_MS,
+          `AI生成超时(${RULES.PROMPT_HANDLER_TIMEOUT_MS}ms)`,
+        );
+      } catch (error) {
+        aiResult = { ok: false, events: [], error: error?.message || String(error) };
+      }
+
+      if (!aiResult.ok) {
+        addAnchorLog('AI_FALLBACK', `AI失败，改用规则生成: ${aiResult.error}`);
       }
 
       const generatedByAi = aiResult.events;

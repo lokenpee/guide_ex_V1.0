@@ -1,3 +1,15 @@
+:root {
+  --revt-bg-darker: #121212;
+  --revt-bg-dark: #1d1f24;
+  --revt-bg-medium: #292d34;
+  --revt-border: #3d434d;
+  --revt-text-main: rgba(255, 255, 255, 0.92);
+  --revt-text-muted: rgba(255, 255, 255, 0.66);
+  --revt-accent: #18a0fb;
+  --revt-success: #2ecc71;
+  --revt-warn: #ffb020;
+}
+
 #revt-wrapper {
   margin-top: 8px;
 }
@@ -6,38 +18,47 @@
   width: min(560px, 92vw);
   max-height: 78vh;
   overflow-y: auto;
+  background: linear-gradient(180deg, var(--revt-bg-dark) 0%, var(--revt-bg-darker) 100%);
+  color: var(--revt-text-main);
+  border: 1px solid var(--revt-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
 }
 
 #revt-content-panel {
-  padding: 10px;
+  padding: 12px;
 }
 
 .drawer-header h3 {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-size: 16px;
+  letter-spacing: 0.2px;
 }
 
 .revt-tab-nav {
   display: flex;
-  gap: 8px;
-  border-bottom: 1px solid var(--SmartThemeBorderColor);
-  padding-bottom: 8px;
-  margin-bottom: 10px;
+  gap: 4px;
+  background: var(--revt-bg-medium);
+  border: 1px solid var(--revt-border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 12px;
 }
 
 .revt-tab-btn {
-  border: 1px solid var(--SmartThemeBorderColor);
-  background: color-mix(in srgb, var(--SmartThemeBodyColor) 92%, white 8%);
-  color: var(--SmartThemeBodyColor);
-  border-radius: 999px;
-  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--revt-text-muted);
+  border-radius: 8px;
+  padding: 8px 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .revt-tab-btn.active {
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor) 28%, var(--SmartThemeBodyColor) 72%);
-  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor) 55%, var(--SmartThemeBorderColor) 45%);
+  background: rgba(24, 160, 251, 0.16);
+  color: #eaf6ff;
+  box-shadow: inset 0 -2px 0 0 var(--revt-accent);
 }
 
 .revt-tab-panel {
@@ -53,10 +74,10 @@
 }
 
 .revt-card {
-  border: 1px solid var(--SmartThemeBorderColor);
+  border: 1px solid var(--revt-border);
   border-radius: 10px;
-  padding: 10px;
-  background: color-mix(in srgb, var(--SmartThemeBodyColor) 95%, white 5%);
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%);
 }
 
 .revt-toolbar {
@@ -73,13 +94,19 @@
 }
 
 .revt-chat-hint {
-  opacity: 0.7;
+  opacity: 0.85;
   font-size: 12px;
+  color: var(--revt-text-muted);
 }
 
 #revt-preference {
   width: 100%;
   resize: vertical;
+  border: 1px solid var(--revt-border);
+  border-radius: 8px;
+  background: #181b20;
+  color: var(--revt-text-main);
+  padding: 8px;
 }
 
 .revt-actions {
@@ -99,31 +126,37 @@
 .revt-grid input,
 .revt-grid select {
   width: 100%;
+  border: 1px solid var(--revt-border);
+  border-radius: 8px;
+  background: #181b20;
+  color: var(--revt-text-main);
+  padding: 6px 8px;
 }
 
 .revt-muted {
-  opacity: 0.75;
+  opacity: 1;
   font-size: 12px;
+  color: var(--revt-text-muted);
 }
 
 .revt-status-loading {
-  color: var(--SmartThemeQuoteColor);
+  color: var(--revt-accent);
 }
 
 .revt-status-ok {
-  color: var(--SmartThemeEmColor);
+  color: var(--revt-success);
 }
 
 .revt-status-warn {
-  color: var(--SmartThemeWarningColor);
+  color: var(--revt-warn);
 }
 
 .revt-event {
-  border: 1px solid var(--SmartThemeBorderColor);
+  border: 1px solid var(--revt-border);
   border-radius: 8px;
-  padding: 8px;
+  padding: 10px;
   margin-top: 8px;
-  background: color-mix(in srgb, var(--SmartThemeBodyColor) 93%, white 7%);
+  background: #1b1f26;
 }
 
 .revt-event-top {
@@ -139,11 +172,12 @@
 
 .revt-chip {
   display: inline-block;
-  border: 1px solid var(--SmartThemeBorderColor);
+  border: 1px solid var(--revt-border);
   border-radius: 999px;
   padding: 1px 7px;
   margin-right: 5px;
   font-size: 11px;
+  background: rgba(24, 160, 251, 0.08);
 }
 
 .revt-event-main {
@@ -165,11 +199,12 @@
 }
 
 .revt-log-box {
-  border: 1px dashed var(--SmartThemeBorderColor);
+  border: 1px dashed var(--revt-border);
   border-radius: 8px;
   padding: 8px;
   max-height: 160px;
   overflow-y: auto;
+  background: #171a20;
 }
 
 .revt-log-item {
