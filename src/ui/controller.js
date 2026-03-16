@@ -5,6 +5,10 @@ import { getApiSettings, saveApiSettings } from '../services/apiSettingsService.
 import { addAnchorLog, getAnchorLogs, subscribeAnchorLogs } from '../services/runtimeLogService.js';
 
 const refs = {
+  wrapper: null,
+  drawerToggle: null,
+  toolbarIcon: null,
+  contentPanel: null,
   enabled: null,
   preference: null,
   list: null,
@@ -23,6 +27,10 @@ const refs = {
 let modelFetchTimer = null;
 
 function resolveRefs() {
+  refs.wrapper = document.getElementById('revt-wrapper');
+  refs.drawerToggle = refs.wrapper?.querySelector('.drawer-toggle') || null;
+  refs.toolbarIcon = document.getElementById('revt-toolbar-icon');
+  refs.contentPanel = document.getElementById('revt-content-panel');
   refs.enabled = document.getElementById('revt-enabled');
   refs.preference = document.getElementById('revt-preference');
   refs.list = document.getElementById('revt-list');
@@ -36,6 +44,22 @@ function resolveRefs() {
   refs.modelOptions = document.getElementById('revt-model-options');
   refs.modelFetchStatus = document.getElementById('revt-model-fetch-status');
   refs.anchorLogs = document.getElementById('revt-anchor-log-list');
+}
+
+function bindDrawerToggle() {
+  if (!refs.drawerToggle || !refs.contentPanel) return;
+
+  refs.drawerToggle.onclick = () => {
+    const isOpen = refs.contentPanel.classList.contains('openDrawer');
+
+    refs.contentPanel.classList.toggle('openDrawer', !isOpen);
+    refs.contentPanel.classList.toggle('closedDrawer', isOpen);
+
+    if (refs.toolbarIcon) {
+      refs.toolbarIcon.classList.toggle('openIcon', !isOpen);
+      refs.toolbarIcon.classList.toggle('closedIcon', isOpen);
+    }
+  };
 }
 
 function renderModelCandidates(candidates, currentModel) {
@@ -137,6 +161,7 @@ export function refreshUi() {
 
 export function mountUiHandlers({ onDeleteEvent, onGenerateIfEmpty, onApiTest, onFetchModels }) {
   resolveRefs();
+  bindDrawerToggle();
   refreshUi();
   subscribeAnchorLogs(() => {
     renderAnchorLogs(refs.anchorLogs, getAnchorLogs());
