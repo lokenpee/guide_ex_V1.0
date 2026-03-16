@@ -10,6 +10,11 @@ import { poolService } from './src/services/poolService.js';
 import { validatePool } from './src/services/validatorService.js';
 import { refreshUi, mountUiHandlers } from './src/ui/controller.js';
 
+function getExtensionFolderName() {
+  const match = /\/scripts\/extensions\/third-party\/([^/]+)\//.exec(import.meta.url);
+  return match?.[1] ? decodeURIComponent(match[1]) : 'guide_ex_V1.0';
+}
+
 function shouldSkipPromptReady(eventData) {
   if (!eventData || typeof eventData !== 'object' || eventData.dryRun) return true;
 
@@ -118,7 +123,8 @@ async function onPromptReady(eventData) {
 }
 
 async function setupUi() {
-  const html = await appManager.renderExtensionTemplateAsync('third-party/酒馆_随机事件生成器', 'drawer-component');
+  const extensionFolder = getExtensionFolderName();
+  const html = await appManager.renderExtensionTemplateAsync(`third-party/${extensionFolder}`, 'drawer-component');
   $('#extensions_settings2').append(html);
 
   mountUiHandlers({
