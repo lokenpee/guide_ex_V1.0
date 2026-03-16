@@ -48,3 +48,18 @@ export function renderDeletedLogs(container, logs) {
 
   container.innerHTML = rows.join('');
 }
+
+export function renderAnchorLogs(container, logs) {
+  if (!container) return;
+  const list = Array.isArray(logs) ? logs : [];
+  if (list.length === 0) {
+    container.innerHTML = '<div class="revt-muted">暂无运行锚点</div>';
+    return;
+  }
+
+  const rows = list.slice(-20).reverse().map((row) => {
+    const detail = row.detail ? ` | ${row.detail}` : '';
+    return `<div class="revt-log-item">${row.time} [${row.tag}]${detail}</div>`;
+  });
+  container.innerHTML = rows.join('');
+}

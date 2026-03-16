@@ -6,6 +6,7 @@ const defaultApiSettings = {
   apiUrl: '',
   apiKey: '',
   modelName: '',
+  modelCandidates: [],
   tavernProfile: '',
   temperature: 0.8,
   maxTokens: 1500,
@@ -22,6 +23,9 @@ export function loadApiSettings() {
 
 export function saveApiSettings(settings) {
   cached = { ...defaultApiSettings, ...(settings || {}) };
+  if (!Array.isArray(cached.modelCandidates)) {
+    cached.modelCandidates = [];
+  }
   storage.writeJson(STORAGE_KEYS.API_SETTINGS, cached);
   return cached;
 }

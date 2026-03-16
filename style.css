@@ -2,6 +2,12 @@
   margin-top: 8px;
 }
 
+#revt-wrapper.drawer .drawer-content {
+  width: min(560px, 92vw);
+  max-height: 78vh;
+  overflow-y: auto;
+}
+
 .revt-row {
   margin-bottom: 10px;
 }
@@ -51,6 +57,18 @@
 .revt-muted {
   opacity: 0.75;
   font-size: 12px;
+}
+
+.revt-status-loading {
+  color: var(--SmartThemeQuoteColor);
+}
+
+.revt-status-ok {
+  color: var(--SmartThemeEmColor);
+}
+
+.revt-status-warn {
+  color: var(--SmartThemeWarningColor);
 }
 
 .revt-event {

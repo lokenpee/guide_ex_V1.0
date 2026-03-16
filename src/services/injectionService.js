@@ -1,11 +1,14 @@
+import { CONTEXT_LIMITS } from '../constants.js';
+import { truncateText } from '../utils/text.js';
+
 export function buildInjectionPrompt({ preference, worldbook, outline, lastUser, lastAi, pool }) {
   const poolText = (Array.isArray(pool) ? pool : []).map((e, i) => {
     return [
       `${i + 1}. ${e.title}`,
-      `- event: ${e.event}`,
+      `- event: ${truncateText(e.event, 180)}`,
       `- when: ${e.when}`,
       `- impact: ${e.impact}`,
-      `- requirements: ${(e.requirements || []).join('；') || '无'}`,
+      `- requirements: ${truncateText((e.requirements || []).join('；') || '无', 120)}`,
     ].join('\n');
   }).join('\n\n');
 
@@ -19,22 +22,22 @@ export function buildInjectionPrompt({ preference, worldbook, outline, lastUser,
     '4) 不要提及插件、系统提示词、事件池。',
     '',
     '[最新对话块]',
-    `玩家上一条: ${lastUser || '（缺失）'}`,
-    `AI上一条: ${lastAi || '（缺失）'}`,
+    `玩家上一条: ${truncateText(lastUser || '（缺失）', CONTEXT_LIMITS.LAST_USER_MAX)}`,
+    `AI上一条: ${truncateText(lastAi || '（缺失）', CONTEXT_LIMITS.LAST_AI_MAX)}`,
     '',
     '[外部上下文块]',
-    `玩家偏好: ${preference || '（缺失）'}`,
-    `世界书: ${worldbook || '（缺失）'}`,
-    `剧情大纲: ${outline || '（缺失）'}`,
+    `玩家偏好: ${truncateText(preference || '（缺失）', CONTEXT_LIMITS.PREFERENCE_MAX)}`,
+    `世界书: ${truncateText(worldbook || '（缺失）', CONTEXT_LIMITS.WORLDBOOK_MAX)}`,
+    `剧情大纲: ${truncateText(outline || '（缺失）', CONTEXT_LIMITS.OUTLINE_MAX)}`,
     '',
     '[事件池块]',
-    poolText || '（空）',
+    truncateText(poolText || '（空）', 1800),
     '',
     '[输出约束块]',
     '请直接输出正常剧情正文。',
   ];
 
-  return blocks.join('\n');
+  return truncateText(blocks.join('\n'), CONTEXT_LIMITS.PROMPT_MAX);
 }
 
 export function injectPromptToChat(eventData, prompt) {

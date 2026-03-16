@@ -35,6 +35,38 @@ export class LLMApiService {
     return this.#callViaDirectOpenAI(prompt);
   }
 
+  async fetchModelList() {
+    if (this.config.apiProvider !== 'direct_openai') {
+      return [];
+    }
+    if (!this.config.apiUrl || !this.config.apiKey) {
+      throw new Error('请先填写 API URL 和 API Key');
+    }
+
+    const modelsUrl = this.#buildModelsUrl(this.config.apiUrl);
+    const resp = await fetch(modelsUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.apiKey}`,
+      },
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`获取模型失败 HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await resp.json();
+    const list = this.#extractModels(data);
+    return list
+      .filter(Boolean)
+      .filter((m) => typeof m === 'string')
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0)
+      .sort();
+  }
+
   async #callViaSillyTavern(prompt) {
     if (typeof appManager.generateRaw !== 'function') {
       throw new Error('SillyTavern generateRaw 不可用');
@@ -71,5 +103,29 @@ export class LLMApiService {
 
     const data = await resp.json();
     return data?.choices?.[0]?.message?.content || '';
+  }
+
+  #buildModelsUrl(rawUrl) {
+    let url = String(rawUrl || '').trim();
+    if (url.includes('/chat/completions')) {
+      return url.replace('/chat/completions', '/models');
+    }
+    if (url.includes('/v1')) {
+      return url.replace(/\/v1.*$/, '/v1/models');
+    }
+    return `${url.replace(/\/$/, '')}/models`;
+  }
+
+  #extractModels(data) {
+    if (Array.isArray(data)) {
+      return data.map((x) => x?.id || x?.model || x);
+    }
+    if (Array.isArray(data?.data)) {
+      return data.data.map((x) => x?.id || x?.model || x);
+    }
+    if (Array.isArray(data?.models)) {
+      return data.models.map((x) => x?.id || x?.model || x);
+    }
+    return [];
   }
 }

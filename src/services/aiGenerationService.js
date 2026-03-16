@@ -13,6 +13,37 @@ export async function testAIGenerationConnection() {
   return llm.testConnection();
 }
 
+export async function fetchAIGenerationModels() {
+  updateAIGenerationConfig();
+  return llm.fetchModelList();
+}
+
+export async function generateEventsByAIWithStatus(source) {
+  updateAIGenerationConfig();
+
+  const prompt = buildGeneratePrompt(source);
+  try {
+    const response = await llm.callLLM(prompt);
+    const parsed = parseJsonArray(String(response || ''));
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return { ok: false, events: [], error: 'AI返回格式无效或为空' };
+    }
+
+    const events = parsed
+      .map(normalizeEvent)
+      .filter(Boolean)
+      .slice(0, RULES.POOL_MAX);
+
+    if (events.length === 0) {
+      return { ok: false, events: [], error: 'AI返回事件均不合法' };
+    }
+    return { ok: true, events, error: '' };
+  } catch (err) {
+    console.warn('[REVT] AI生成事件失败。', err);
+    return { ok: false, events: [], error: err?.message || String(err) };
+  }
+}
+
 function buildGeneratePrompt(source) {
   const lines = [
     '你是随机事件生成器。',
@@ -83,20 +114,6 @@ function normalizeEvent(evt) {
 }
 
 export async function generateEventsByAI(source) {
-  updateAIGenerationConfig();
-
-  const prompt = buildGeneratePrompt(source);
-  try {
-    const response = await llm.callLLM(prompt);
-    const parsed = parseJsonArray(String(response || ''));
-    if (!Array.isArray(parsed) || parsed.length === 0) return [];
-
-    return parsed
-      .map(normalizeEvent)
-      .filter(Boolean)
-      .slice(0, RULES.POOL_MAX);
-  } catch (err) {
-    console.warn('[REVT] generateRaw 生成事件失败，将回退本地生成。', err);
-    return [];
-  }
+  const result = await generateEventsByAIWithStatus(source);
+  return result.events;
 }

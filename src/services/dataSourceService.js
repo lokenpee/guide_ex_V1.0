@@ -1,7 +1,15 @@
 import { loadWorldInfo, world_info } from '/scripts/world-info.js';
 import { getCharaFilename, onlyUnique } from '/scripts/utils.js';
+import { CONTEXT_LIMITS } from '../constants.js';
 import { appManager } from '../core/appManager.js';
-import { normalizeText } from '../utils/text.js';
+import { normalizeText, truncateText } from '../utils/text.js';
+
+const contextCache = {
+  chatId: '',
+  ts: 0,
+  value: null,
+};
+const CONTEXT_CACHE_TTL_MS = 3000;
 
 function getRootWindow() {
   if (typeof window === 'undefined') return null;
@@ -110,7 +118,7 @@ async function buildWorldbookText() {
         continue;
       }
 
-      entries.forEach((e) => {
+      entries.slice(0, CONTEXT_LIMITS.WORLD_ENTRIES_MAX).forEach((e) => {
         const keys = e.keys.length ? ` | Keys: ${e.keys.join(', ')}` : '';
         blocks.push(`- [${e.id}] ${e.comment || '未命名条目'}${keys}`);
         blocks.push(e.content ? e.content.trim() : '（空）');
@@ -118,7 +126,7 @@ async function buildWorldbookText() {
       });
     }
 
-    return normalizeText(blocks.join('\n').trim());
+    return truncateText(blocks.join('\n').trim(), CONTEXT_LIMITS.WORLDBOOK_MAX);
   } catch (error) {
     console.warn('[REVT] 世界书读取失败，回退空文本。', error);
     return '';
@@ -136,10 +144,10 @@ function buildOutlineFromDatabase() {
     const outlineTable = findTableByName(data, '总体大纲');
     const summaryTable = findTableByName(data, '总结表');
 
-    const outlineText = tableToText(outlineTable, '总体大纲');
-    const summaryText = tableToText(summaryTable, '总结表（最新10条）', 10, true);
+    const outlineText = tableToText(outlineTable, '总体大纲', CONTEXT_LIMITS.DB_OUTLINE_ROWS_MAX);
+    const summaryText = tableToText(summaryTable, '总结表（最新）', CONTEXT_LIMITS.DB_SUMMARY_ROWS_MAX, true);
 
-    return [outlineText, summaryText].join('\n\n');
+    return truncateText([outlineText, summaryText].join('\n\n'), CONTEXT_LIMITS.OUTLINE_MAX);
   } catch (error) {
     console.warn('[REVT] 数据库大纲读取失败，回退空文本。', error);
     return '';
@@ -176,16 +184,34 @@ function buildOutlineFromLeader() {
 
 export async function getPreciseExternalContext() {
   const context = appManager.getContext();
-  const chatMetadataOutline = normalizeText(context?.chatMetadata?.story_outline || context?.chatMetadata?.outline || '');
+  const chatId = String(context?.chatId || 'no-chat');
+  const now = Date.now();
+
+  if (contextCache.value && contextCache.chatId === chatId && (now - contextCache.ts) < CONTEXT_CACHE_TTL_MS) {
+    return contextCache.value;
+  }
+
+  const chatMetadataOutline = truncateText(
+    normalizeText(context?.chatMetadata?.story_outline || context?.chatMetadata?.outline || ''),
+    CONTEXT_LIMITS.OUTLINE_MAX,
+  );
 
   const worldbook = await buildWorldbookText();
   const dbOutline = buildOutlineFromDatabase();
   const leaderOutline = buildOutlineFromLeader();
 
-  const outline = [dbOutline, leaderOutline, chatMetadataOutline].filter(Boolean).join('\n\n');
+  const outline = truncateText(
+    [dbOutline, leaderOutline, chatMetadataOutline].filter(Boolean).join('\n\n'),
+    CONTEXT_LIMITS.OUTLINE_MAX,
+  );
 
-  return {
-    worldbook,
+  const result = {
+    worldbook: truncateText(worldbook, CONTEXT_LIMITS.WORLDBOOK_MAX),
     outline,
   };
+
+  contextCache.chatId = chatId;
+  contextCache.ts = now;
+  contextCache.value = result;
+  return result;
 }
