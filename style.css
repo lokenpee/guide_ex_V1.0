@@ -8,8 +8,55 @@
   overflow-y: auto;
 }
 
+#revt-content-panel {
+  padding: 10px;
+}
+
+.drawer-header h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.revt-tab-nav {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--SmartThemeBorderColor);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.revt-tab-btn {
+  border: 1px solid var(--SmartThemeBorderColor);
+  background: color-mix(in srgb, var(--SmartThemeBodyColor) 92%, white 8%);
+  color: var(--SmartThemeBodyColor);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.revt-tab-btn.active {
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor) 28%, var(--SmartThemeBodyColor) 72%);
+  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor) 55%, var(--SmartThemeBorderColor) 45%);
+}
+
+.revt-tab-panel {
+  display: none;
+}
+
+.revt-tab-panel.active {
+  display: block;
+}
+
 .revt-row {
   margin-bottom: 10px;
+}
+
+.revt-card {
+  border: 1px solid var(--SmartThemeBorderColor);
+  border-radius: 10px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--SmartThemeBodyColor) 95%, white 5%);
 }
 
 .revt-toolbar {
@@ -129,4 +176,15 @@
   font-size: 12px;
   opacity: 0.9;
   margin: 2px 0;
+}
+
+@media (max-width: 640px) {
+  .revt-tab-nav {
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+
+  .revt-grid {
+    grid-template-columns: 1fr;
+  }
 }

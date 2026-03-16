@@ -9,6 +9,8 @@ const refs = {
   drawerToggle: null,
   toolbarIcon: null,
   contentPanel: null,
+  tabButtons: [],
+  tabPanels: [],
   enabled: null,
   preference: null,
   list: null,
@@ -31,6 +33,8 @@ function resolveRefs() {
   refs.drawerToggle = refs.wrapper?.querySelector('.drawer-toggle') || null;
   refs.toolbarIcon = document.getElementById('revt-toolbar-icon');
   refs.contentPanel = document.getElementById('revt-content-panel');
+  refs.tabButtons = Array.from(document.querySelectorAll('.revt-tab-btn'));
+  refs.tabPanels = Array.from(document.querySelectorAll('.revt-tab-panel'));
   refs.enabled = document.getElementById('revt-enabled');
   refs.preference = document.getElementById('revt-preference');
   refs.list = document.getElementById('revt-list');
@@ -60,6 +64,27 @@ function bindDrawerToggle() {
       refs.toolbarIcon.classList.toggle('closedIcon', isOpen);
     }
   };
+}
+
+function bindTabs() {
+  if (!refs.tabButtons.length || !refs.tabPanels.length) return;
+
+  const activatePanel = (panelId) => {
+    for (const btn of refs.tabButtons) {
+      btn.classList.toggle('active', btn.dataset.panel === panelId);
+    }
+    for (const panel of refs.tabPanels) {
+      panel.classList.toggle('active', panel.id === panelId);
+    }
+  };
+
+  for (const btn of refs.tabButtons) {
+    btn.addEventListener('click', () => {
+      const panelId = btn.dataset.panel;
+      if (!panelId) return;
+      activatePanel(panelId);
+    });
+  }
 }
 
 function renderModelCandidates(candidates, currentModel) {
@@ -97,9 +122,14 @@ function saveApiForm() {
 
 async function fetchModelsAndBind(onFetchModels) {
   const api = saveApiForm();
-  if (api.apiProvider !== 'direct_openai') {
-    addAnchorLog('MODEL_FETCH_SKIP', 'provider!=direct_openai');
+  if (api.apiProvider === 'sillytavern_preset') {
+    addAnchorLog('MODEL_FETCH_SKIP', 'provider=sillytavern_preset');
     setModelFetchStatus('当前提供商无需自动拉取模型', 'muted');
+    return;
+  }
+  if (api.apiProvider === 'sillytavern_proxy_openai') {
+    addAnchorLog('MODEL_FETCH_SKIP', 'provider=sillytavern_proxy_openai');
+    setModelFetchStatus('代理模式暂不支持自动拉取模型，请手动填写模型名', 'muted');
     return;
   }
   if (!api.apiUrl || !api.apiKey) {
@@ -150,6 +180,10 @@ export function refreshUi() {
   renderModelCandidates(api.modelCandidates || [], api.modelName || '');
   if ((api.modelCandidates || []).length > 0) {
     setModelFetchStatus(`已缓存 ${(api.modelCandidates || []).length} 个模型`, 'ok');
+  } else if (api.apiProvider === 'sillytavern_preset') {
+    setModelFetchStatus('预设模式使用当前酒馆模型，无需拉取', 'muted');
+  } else if (api.apiProvider === 'sillytavern_proxy_openai') {
+    setModelFetchStatus('代理模式建议手动填写模型名', 'muted');
   } else {
     setModelFetchStatus('填写 URL + Key 后会自动拉取模型', 'muted');
   }
@@ -162,6 +196,7 @@ export function refreshUi() {
 export function mountUiHandlers({ onDeleteEvent, onGenerateIfEmpty, onApiTest, onFetchModels }) {
   resolveRefs();
   bindDrawerToggle();
+  bindTabs();
   refreshUi();
   subscribeAnchorLogs(() => {
     renderAnchorLogs(refs.anchorLogs, getAnchorLogs());
