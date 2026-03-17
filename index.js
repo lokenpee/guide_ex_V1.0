@@ -115,7 +115,7 @@ async function updateStoryOutlineBeforeGeneration(chatId, userText, aiText) {
 }
 
 async function generateIfPoolEmpty() {
-  addAnchorLog('POOL_CHECK', '开始检查是否空池生成');
+  addAnchorLog('POOL_CHECK', '开始检查是否需要补充事件');
   const chatId = contextService.getChatId();
   const pool = poolService.loadPool(chatId);
   if (pool.length >= RULES.POOL_MAX) {
@@ -124,9 +124,9 @@ async function generateIfPoolEmpty() {
     return;
   }
 
-  if (pool.length > 0) {
-    addAnchorLog('POOL_SKIP_GENERATE', `pool=${pool.length}, reason=non-empty`);
-    if (typeof toastr !== 'undefined') toastr.info('事件池为1-4条，按规则默认不生成', '随机事件池');
+  if (pool.length >= RULES.GENERATE_MIN) {
+    addAnchorLog('POOL_SKIP_GENERATE', `pool=${pool.length}, reason=enough`);
+    if (typeof toastr !== 'undefined') toastr.info('事件池已达到3条及以上，不需要补充', '随机事件池');
     return;
   }
 
@@ -156,12 +156,12 @@ async function generateIfPoolEmpty() {
   const generated = aiResult.events;
   addAnchorLog('POOL_GENERATED', `count=${generated.length}`);
 
-  const deduped = poolService.dedupeByTitle(generated);
+  const deduped = poolService.dedupeByTitle([...pool, ...generated]);
   poolService.savePool(chatId, deduped.output);
   if (deduped.removed.length) {
     poolService.appendDeletedHistory(chatId, deduped.removed);
   }
-  if (typeof toastr !== 'undefined') toastr.success(`已生成 ${deduped.output.length} 条事件`, '随机事件池');
+  if (typeof toastr !== 'undefined') toastr.success(`已补充到 ${deduped.output.length} 条事件`, '随机事件池');
 }
 
 async function onPromptReady(eventData) {
@@ -220,8 +220,8 @@ async function onPromptReady(eventData) {
       poolService.appendDeletedHistory(chatId, deduped.removed);
     }
 
-    if (pool.length === 0) {
-      addAnchorLog('POOL_EMPTY', '准备生成新事件');
+    if (pool.length < RULES.GENERATE_MIN) {
+      addAnchorLog('POOL_LOW', `当前${pool.length}条，准备补充`);
       const source = {
         preference: poolService.loadPreference(chatId),
         aiRules: poolService.loadAiRules(chatId),
@@ -247,7 +247,7 @@ async function onPromptReady(eventData) {
       }
 
       const generated = aiResult.events;
-      pool = poolService.dedupeByTitle(generated).output;
+      pool = poolService.dedupeByTitle([...pool, ...generated]).output;
       addAnchorLog('POOL_FILLED', `count=${pool.length}`);
     }
 

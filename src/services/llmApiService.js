@@ -119,8 +119,19 @@ export class LLMApiService {
     }
 
     const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content || data?.content || '';
+    const content = this.#extractAssistantContent(data);
     if (!content) {
+      const choice = Array.isArray(data?.choices) ? data.choices[0] : null;
+      const finishReason = String(choice?.finish_reason || '').trim();
+      const reasoningText = this.#normalizeTextPart(choice?.message?.reasoning_content);
+
+      if (reasoningText) {
+        if (finishReason === 'length') {
+          throw new Error('模型仅输出思考且被截断（finish_reason=length），未产出最终content。请提高max tokens或改用非reasoner模型。');
+        }
+        throw new Error('模型仅输出reasoning_content，未产出最终content。请关闭深度思考或改用普通chat模型。');
+      }
+
       throw new Error('代理模式未返回有效内容');
     }
     return content;
@@ -164,7 +175,60 @@ export class LLMApiService {
     }
 
     const data = await resp.json();
-    return data?.choices?.[0]?.message?.content || '';
+    const content = this.#extractAssistantContent(data);
+    if (content) return content;
+
+    const choice = Array.isArray(data?.choices) ? data.choices[0] : null;
+    const finishReason = String(choice?.finish_reason || '').trim();
+    const reasoningText = this.#normalizeTextPart(choice?.message?.reasoning_content);
+    if (reasoningText) {
+      if (finishReason === 'length') {
+        throw new Error('模型仅输出思考且被截断（finish_reason=length），未产出最终content。请提高max tokens或改用非reasoner模型。');
+      }
+      throw new Error('模型仅输出reasoning_content，未产出最终content。请关闭深度思考或改用普通chat模型。');
+    }
+
+    throw new Error('直连模式未返回有效内容');
+  }
+
+  #extractAssistantContent(data) {
+    if (!data || typeof data !== 'object') return '';
+
+    const choice = Array.isArray(data.choices) ? data.choices[0] : null;
+    const msg = choice?.message || {};
+
+    const candidates = [
+      msg.content,
+      choice?.text,
+      data?.content,
+      data?.response,
+      data?.output_text,
+      data?.output,
+    ];
+
+    for (const candidate of candidates) {
+      const text = this.#normalizeTextPart(candidate);
+      if (text) return text;
+    }
+
+    return '';
+  }
+
+  #normalizeTextPart(value) {
+    if (typeof value === 'string') return value.trim();
+    if (Array.isArray(value)) {
+      return value
+        .map((part) => {
+          if (typeof part === 'string') return part;
+          if (part && typeof part === 'object') {
+            return part.text || part.content || '';
+          }
+          return '';
+        })
+        .join('')
+        .trim();
+    }
+    return '';
   }
 
   #buildModelsUrl(rawUrl) {
