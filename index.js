@@ -2,7 +2,13 @@ import { RULES } from './src/constants.js';
 import { appManager } from './src/core/appManager.js';
 import { consumeUserSendFlag, markUserSend, runtimeState } from './src/core/runtimeState.js';
 import { contextService } from './src/services/contextService.js';
-import { fetchAIGenerationModels, generateEventsByAI, generateEventsByAIWithStatus, testAIGenerationConnection } from './src/services/aiGenerationService.js';
+import {
+  fetchAIGenerationModels,
+  generateEventsByAI,
+  generateEventsByAIWithStatus,
+  summarizeLatestRoundOutlineWithStatus,
+  testAIGenerationConnection,
+} from './src/services/aiGenerationService.js';
 import { getPreciseExternalContext } from './src/services/dataSourceService.js';
 import { buildInjectionPrompt, injectPromptToChat } from './src/services/injectionService.js';
 import { poolService } from './src/services/poolService.js';
@@ -74,6 +80,40 @@ function removeEventById(eventId) {
   }
 }
 
+async function updateStoryOutlineBeforeGeneration(chatId, userText, aiText) {
+  if (!userText && !aiText) return;
+
+  const existing = poolService.loadStoryOutline(chatId);
+  const result = await summarizeLatestRoundOutlineWithStatus({
+    existingOutline: existing,
+    lastUser: userText,
+    lastAi: aiText,
+  });
+
+  if (!result.ok) {
+    addAnchorLog('OUTLINE_SUMMARY_FAIL', result.error || 'unknown');
+    return;
+  }
+  if (!result.append || !result.summary) {
+    addAnchorLog('OUTLINE_SUMMARY_SKIP', 'same-topic');
+    return;
+  }
+
+  const latest = poolService.loadStoryOutline(chatId);
+  const normalizedSummary = String(result.summary || '').trim();
+  if (!normalizedSummary) return;
+
+  const lines = String(latest || '').split('\n').map((x) => x.trim()).filter(Boolean);
+  if (lines.length > 0 && lines[lines.length - 1] === normalizedSummary) {
+    addAnchorLog('OUTLINE_SUMMARY_SKIP', 'duplicate-last-line');
+    return;
+  }
+
+  const next = latest ? `${latest}\n${normalizedSummary}` : normalizedSummary;
+  poolService.saveStoryOutline(chatId, next);
+  addAnchorLog('OUTLINE_SUMMARY_APPEND', normalizedSummary);
+}
+
 async function generateIfPoolEmpty() {
   addAnchorLog('POOL_CHECK', '开始检查是否空池生成');
   const chatId = contextService.getChatId();
@@ -91,9 +131,15 @@ async function generateIfPoolEmpty() {
   }
 
   const { userText, aiText } = contextService.getLastExchange();
+  await withTimeout(
+    updateStoryOutlineBeforeGeneration(chatId, userText, aiText),
+    RULES.PROMPT_HANDLER_TIMEOUT_MS,
+    `梗概总结超时(${RULES.PROMPT_HANDLER_TIMEOUT_MS}ms)`,
+  );
   const external = await getPreciseExternalContext();
   const source = {
     preference: poolService.loadPreference(chatId),
+    aiRules: poolService.loadAiRules(chatId),
     outline: external.outline,
     worldbook: external.worldbook,
     lastUser: userText,
@@ -149,6 +195,11 @@ async function onPromptReady(eventData) {
     const chatId = contextService.getChatId();
     let pool = poolService.loadPool(chatId);
     const { userText, aiText } = contextService.getLastExchange();
+    await withTimeout(
+      updateStoryOutlineBeforeGeneration(chatId, userText, aiText),
+      RULES.PROMPT_HANDLER_TIMEOUT_MS,
+      `梗概总结超时(${RULES.PROMPT_HANDLER_TIMEOUT_MS}ms)`,
+    );
     const external = await withTimeout(
       getPreciseExternalContext(),
       RULES.PROMPT_HANDLER_TIMEOUT_MS,
@@ -173,6 +224,7 @@ async function onPromptReady(eventData) {
       addAnchorLog('POOL_EMPTY', '准备生成新事件');
       const source = {
         preference: poolService.loadPreference(chatId),
+        aiRules: poolService.loadAiRules(chatId),
         outline: external.outline,
         worldbook: external.worldbook,
         lastUser: userText,

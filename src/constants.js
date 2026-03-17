@@ -3,6 +3,9 @@ export const EXTENSION_ID = 'random-event-pool';
 export const STORAGE_KEYS = {
   ENABLED: `${EXTENSION_ID}:enabled`,
   PREFERENCE_PREFIX: `${EXTENSION_ID}:preference:`,
+  AI_RULES_PREFIX: `${EXTENSION_ID}:ai-rules:`,
+  STORY_OUTLINE_PREFIX: `${EXTENSION_ID}:story-outline:`,
+  WORLDBOOK_SOURCE_PREFIX: `${EXTENSION_ID}:worldbook-source:`,
   POOL_PREFIX: `${EXTENSION_ID}:pool:`,
   DELETED_HISTORY_PREFIX: `${EXTENSION_ID}:deleted-history:`,
   API_SETTINGS: `${EXTENSION_ID}:api-settings`,
@@ -27,6 +30,7 @@ export const CONTEXT_LIMITS = {
   LAST_USER_MAX: 500,
   LAST_AI_MAX: 700,
   PREFERENCE_MAX: 600,
+  AI_RULES_MAX: 6000,
   WORLDBOOK_MAX: 2200,
   OUTLINE_MAX: 1800,
   DB_OUTLINE_ROWS_MAX: 12,

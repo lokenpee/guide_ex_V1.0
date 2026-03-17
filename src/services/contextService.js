@@ -1,7 +1,5 @@
 import { appManager } from '../core/appManager.js';
-import { CONTEXT_LIMITS } from '../constants.js';
 import { normalizeText } from '../utils/text.js';
-import { truncateText } from '../utils/text.js';
 
 function getChatId() {
   const context = appManager.getContext();
@@ -19,8 +17,8 @@ function getLastExchange() {
   const lastAi = [...chat].reverse().find((m) => m?.is_user !== true);
 
   return {
-    userText: truncateText(normalizeText(lastUser?.mes || ''), CONTEXT_LIMITS.LAST_USER_MAX),
-    aiText: truncateText(normalizeText(lastAi?.mes || ''), CONTEXT_LIMITS.LAST_AI_MAX),
+    userText: normalizeText(lastUser?.mes || ''),
+    aiText: normalizeText(lastAi?.mes || ''),
   };
 }
 

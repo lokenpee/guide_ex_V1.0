@@ -3,6 +3,13 @@ import { contextService } from '../services/contextService.js';
 import { renderPoolList, renderDeletedLogs, renderAnchorLogs } from './render.js';
 import { getApiSettings, saveApiSettings } from '../services/apiSettingsService.js';
 import { addAnchorLog, getAnchorLogs, subscribeAnchorLogs } from '../services/runtimeLogService.js';
+import {
+  getAvailableWorldBooks,
+  getBookEntries,
+  isEntrySelected,
+  loadWorldbookSourceConfig,
+  saveWorldbookSourceConfig,
+} from '../services/worldbookSourceService.js';
 
 const refs = {
   wrapper: null,
@@ -13,6 +20,16 @@ const refs = {
   tabPanels: [],
   enabled: null,
   preference: null,
+  aiRules: null,
+  storyOutline: null,
+  wbSourceAuto: null,
+  wbSourceManual: null,
+  wbManualPanel: null,
+  wbBooksSearch: null,
+  wbBooksList: null,
+  wbEntriesSearch: null,
+  wbEntriesList: null,
+  wbEntriesCount: null,
   list: null,
   empty: null,
   chatHint: null,
@@ -37,6 +54,16 @@ function resolveRefs() {
   refs.tabPanels = Array.from(document.querySelectorAll('.revt-tab-panel'));
   refs.enabled = document.getElementById('revt-enabled');
   refs.preference = document.getElementById('revt-preference');
+  refs.aiRules = document.getElementById('revt-ai-rules');
+  refs.storyOutline = document.getElementById('revt-story-outline');
+  refs.wbSourceAuto = document.getElementById('revt-wb-source-auto');
+  refs.wbSourceManual = document.getElementById('revt-wb-source-manual');
+  refs.wbManualPanel = document.getElementById('revt-wb-manual-panel');
+  refs.wbBooksSearch = document.getElementById('revt-wb-books-search');
+  refs.wbBooksList = document.getElementById('revt-wb-books-list');
+  refs.wbEntriesSearch = document.getElementById('revt-wb-entries-search');
+  refs.wbEntriesList = document.getElementById('revt-wb-entries-list');
+  refs.wbEntriesCount = document.getElementById('revt-wb-entries-count');
   refs.list = document.getElementById('revt-list');
   refs.empty = document.getElementById('revt-empty');
   refs.chatHint = document.getElementById('revt-chat-hint');
@@ -163,6 +190,234 @@ function scheduleFetchModels(onFetchModels, delayMs = 700) {
   }, delayMs);
 }
 
+function safeDomId(text) {
+  return String(text || '').replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+function updateWorldbookEntryCount() {
+  if (!refs.wbEntriesList || !refs.wbEntriesCount) return;
+  const all = refs.wbEntriesList.querySelectorAll('input[type="checkbox"]');
+  const selected = refs.wbEntriesList.querySelectorAll('input[type="checkbox"]:checked');
+  refs.wbEntriesCount.textContent = `${selected.length} / ${all.length}`;
+}
+
+async function renderWorldbookBooks(chatId) {
+  if (!refs.wbBooksList) return;
+
+  const cfg = loadWorldbookSourceConfig(chatId);
+  const books = await getAvailableWorldBooks();
+  const selectedBooks = cfg.manualBooks || [];
+  refs.wbBooksList.innerHTML = '';
+
+  if (!books.length) {
+    refs.wbBooksList.innerHTML = '<p class="revt-muted">未找到任何世界书</p>';
+    return;
+  }
+
+  books.forEach((bookName) => {
+    const item = document.createElement('div');
+    item.className = 'revt-wb-checkbox-item';
+    item.dataset.bookName = bookName;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `revt-wb-book-${safeDomId(bookName)}`;
+    checkbox.checked = selectedBooks.includes(bookName);
+
+    const label = document.createElement('label');
+    label.htmlFor = checkbox.id;
+    label.textContent = bookName;
+
+    checkbox.addEventListener('change', async () => {
+      const next = loadWorldbookSourceConfig(chatId);
+      if (checkbox.checked) {
+        if (!next.manualBooks.includes(bookName)) next.manualBooks.push(bookName);
+      } else {
+        next.manualBooks = next.manualBooks.filter((x) => x !== bookName);
+        delete next.manualEntries[bookName];
+      }
+      saveWorldbookSourceConfig(chatId, next);
+      await renderWorldbookEntries(chatId);
+    });
+
+    item.appendChild(checkbox);
+    item.appendChild(label);
+    refs.wbBooksList.appendChild(item);
+  });
+}
+
+async function renderWorldbookEntries(chatId) {
+  if (!refs.wbEntriesList) return;
+  const cfg = loadWorldbookSourceConfig(chatId);
+  const selectedBooks = cfg.manualBooks || [];
+
+  refs.wbEntriesList.innerHTML = '';
+  if (!selectedBooks.length) {
+    refs.wbEntriesList.innerHTML = '<p class="revt-muted">请先选择世界书</p>';
+    if (refs.wbEntriesCount) refs.wbEntriesCount.textContent = '0 / 0';
+    return;
+  }
+
+  const allEntries = [];
+  for (const bookName of selectedBooks) {
+    const entries = await getBookEntries(bookName);
+    entries.filter((e) => e.enabled).forEach((entry) => allEntries.push({ ...entry, bookName }));
+  }
+
+  if (!allEntries.length) {
+    refs.wbEntriesList.innerHTML = '<p class="revt-muted">所选世界书没有已启用条目</p>';
+    if (refs.wbEntriesCount) refs.wbEntriesCount.textContent = '0 / 0';
+    return;
+  }
+
+  allEntries.sort((a, b) => String(a.comment || '').localeCompare(String(b.comment || '')));
+
+  allEntries.forEach((entry) => {
+    const item = document.createElement('div');
+    item.className = 'revt-wb-checkbox-item revt-wb-entry-item';
+    item.dataset.bookName = entry.bookName;
+    item.dataset.entryUid = String(entry.uid);
+
+    const left = document.createElement('div');
+    left.className = 'revt-wb-checkbox-item';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `revt-wb-entry-${safeDomId(entry.bookName)}-${safeDomId(entry.uid)}`;
+    checkbox.checked = isEntrySelected(cfg, entry.bookName, entry.uid);
+
+    const label = document.createElement('label');
+    label.htmlFor = checkbox.id;
+    label.textContent = entry.comment || '无标题条目';
+
+    const badge = document.createElement('span');
+    badge.className = 'revt-wb-book-badge';
+    badge.textContent = entry.bookName;
+
+    checkbox.addEventListener('change', () => {
+      const next = loadWorldbookSourceConfig(chatId);
+      if (!Array.isArray(next.manualEntries[entry.bookName])) {
+        next.manualEntries[entry.bookName] = [];
+      }
+
+      const uid = String(entry.uid);
+      const old = next.manualEntries[entry.bookName];
+      const has = old.includes(uid);
+      if (checkbox.checked && !has) old.push(uid);
+      if (!checkbox.checked && has) {
+        next.manualEntries[entry.bookName] = old.filter((x) => x !== uid);
+      }
+      if (!next.manualEntries[entry.bookName].length) {
+        delete next.manualEntries[entry.bookName];
+      }
+      saveWorldbookSourceConfig(chatId, next);
+      updateWorldbookEntryCount();
+    });
+
+    left.appendChild(checkbox);
+    left.appendChild(label);
+    item.appendChild(left);
+    item.appendChild(badge);
+    refs.wbEntriesList.appendChild(item);
+  });
+
+  updateWorldbookEntryCount();
+}
+
+async function applyWorldbookSourceUi(chatId) {
+  const cfg = loadWorldbookSourceConfig(chatId);
+  if (refs.wbSourceAuto) refs.wbSourceAuto.checked = cfg.mode !== 'manual';
+  if (refs.wbSourceManual) refs.wbSourceManual.checked = cfg.mode === 'manual';
+  if (refs.wbManualPanel) refs.wbManualPanel.style.display = cfg.mode === 'manual' ? 'block' : 'none';
+
+  if (cfg.mode === 'manual') {
+    await renderWorldbookBooks(chatId);
+    await renderWorldbookEntries(chatId);
+  }
+}
+
+function bindWorldbookSelector() {
+  refs.wbSourceAuto?.addEventListener('change', async () => {
+    if (!refs.wbSourceAuto.checked) return;
+    const chatId = contextService.getChatId();
+    const next = loadWorldbookSourceConfig(chatId);
+    next.mode = 'auto';
+    saveWorldbookSourceConfig(chatId, next);
+    await applyWorldbookSourceUi(chatId);
+  });
+
+  refs.wbSourceManual?.addEventListener('change', async () => {
+    if (!refs.wbSourceManual.checked) return;
+    const chatId = contextService.getChatId();
+    const next = loadWorldbookSourceConfig(chatId);
+    next.mode = 'manual';
+    saveWorldbookSourceConfig(chatId, next);
+    await applyWorldbookSourceUi(chatId);
+  });
+
+  refs.wbBooksSearch?.addEventListener('input', () => {
+    const term = String(refs.wbBooksSearch.value || '').toLowerCase();
+    refs.wbBooksList?.querySelectorAll('.revt-wb-checkbox-item').forEach((item) => {
+      const label = item.querySelector('label');
+      const text = String(label?.textContent || '').toLowerCase();
+      item.style.display = !term || text.includes(term) ? 'flex' : 'none';
+    });
+  });
+
+  refs.wbEntriesSearch?.addEventListener('input', () => {
+    const term = String(refs.wbEntriesSearch.value || '').toLowerCase();
+    refs.wbEntriesList?.querySelectorAll('.revt-wb-entry-item').forEach((item) => {
+      const label = item.querySelector('label');
+      const text = String(label?.textContent || '').toLowerCase();
+      item.style.display = !term || text.includes(term) ? 'flex' : 'none';
+    });
+  });
+
+  document.getElementById('revt-wb-refresh-books-btn')?.addEventListener('click', async () => {
+    const chatId = contextService.getChatId();
+    await renderWorldbookBooks(chatId);
+  });
+
+  document.getElementById('revt-wb-refresh-entries-btn')?.addEventListener('click', async () => {
+    const chatId = contextService.getChatId();
+    await renderWorldbookEntries(chatId);
+  });
+
+  document.getElementById('revt-wb-select-all-entries')?.addEventListener('click', () => {
+    const chatId = contextService.getChatId();
+    const next = loadWorldbookSourceConfig(chatId);
+    refs.wbEntriesList?.querySelectorAll('.revt-wb-entry-item').forEach((item) => {
+      const bookName = item.dataset.bookName;
+      const uid = String(item.dataset.entryUid || '');
+      if (!bookName || !uid) return;
+      if (!Array.isArray(next.manualEntries[bookName])) next.manualEntries[bookName] = [];
+      if (!next.manualEntries[bookName].includes(uid)) next.manualEntries[bookName].push(uid);
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      if (checkbox) checkbox.checked = true;
+    });
+    saveWorldbookSourceConfig(chatId, next);
+    updateWorldbookEntryCount();
+  });
+
+  document.getElementById('revt-wb-deselect-all-entries')?.addEventListener('click', () => {
+    const chatId = contextService.getChatId();
+    const next = loadWorldbookSourceConfig(chatId);
+    refs.wbEntriesList?.querySelectorAll('.revt-wb-entry-item').forEach((item) => {
+      const bookName = item.dataset.bookName;
+      const uid = String(item.dataset.entryUid || '');
+      if (!bookName || !uid) return;
+      if (Array.isArray(next.manualEntries[bookName])) {
+        next.manualEntries[bookName] = next.manualEntries[bookName].filter((x) => x !== uid);
+        if (!next.manualEntries[bookName].length) delete next.manualEntries[bookName];
+      }
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      if (checkbox) checkbox.checked = false;
+    });
+    saveWorldbookSourceConfig(chatId, next);
+    updateWorldbookEntryCount();
+  });
+}
+
 export function refreshUi() {
   const chatId = contextService.getChatId();
   const pool = poolService.loadPool(chatId);
@@ -170,6 +425,8 @@ export function refreshUi() {
 
   if (refs.enabled) refs.enabled.checked = poolService.loadEnabled();
   if (refs.preference) refs.preference.value = poolService.loadPreference(chatId);
+  if (refs.aiRules) refs.aiRules.value = poolService.loadAiRules(chatId);
+  if (refs.storyOutline) refs.storyOutline.value = poolService.loadStoryOutline(chatId);
   if (refs.chatHint) refs.chatHint.textContent = `chat: ${chatId}`;
 
   const api = getApiSettings();
@@ -191,12 +448,14 @@ export function refreshUi() {
   renderPoolList(refs.list, refs.empty, pool);
   renderDeletedLogs(refs.logs, logs);
   renderAnchorLogs(refs.anchorLogs, getAnchorLogs());
+  applyWorldbookSourceUi(chatId);
 }
 
 export function mountUiHandlers({ onDeleteEvent, onGenerateIfEmpty, onApiTest, onFetchModels }) {
   resolveRefs();
   bindDrawerToggle();
   bindTabs();
+  bindWorldbookSelector();
   refreshUi();
   subscribeAnchorLogs(() => {
     renderAnchorLogs(refs.anchorLogs, getAnchorLogs());
@@ -208,6 +467,18 @@ export function mountUiHandlers({ onDeleteEvent, onGenerateIfEmpty, onApiTest, o
     const chatId = contextService.getChatId();
     poolService.savePreference(chatId, refs.preference?.value || '');
     if (typeof toastr !== 'undefined') toastr.success('偏好已保存', '随机事件池');
+  });
+
+  document.getElementById('revt-save-ai-rules')?.addEventListener('click', () => {
+    const chatId = contextService.getChatId();
+    poolService.saveAiRules(chatId, refs.aiRules?.value || '');
+    if (typeof toastr !== 'undefined') toastr.success('生成规则已保存', '随机事件池');
+  });
+
+  document.getElementById('revt-save-outline')?.addEventListener('click', () => {
+    const chatId = contextService.getChatId();
+    poolService.saveStoryOutline(chatId, refs.storyOutline?.value || '');
+    if (typeof toastr !== 'undefined') toastr.success('故事梗概已保存', '随机事件池');
   });
 
   document.getElementById('revt-save-api')?.addEventListener('click', () => {

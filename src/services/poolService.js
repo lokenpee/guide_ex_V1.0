@@ -22,6 +22,30 @@ function savePreference(chatId, text) {
   storage.writeText(keyOf(STORAGE_KEYS.PREFERENCE_PREFIX, chatId), text || '');
 }
 
+function loadAiRules(chatId) {
+  return storage.readText(keyOf(STORAGE_KEYS.AI_RULES_PREFIX, chatId), '');
+}
+
+function saveAiRules(chatId, text) {
+  storage.writeText(keyOf(STORAGE_KEYS.AI_RULES_PREFIX, chatId), text || '');
+}
+
+function loadStoryOutline(chatId) {
+  return storage.readText(keyOf(STORAGE_KEYS.STORY_OUTLINE_PREFIX, chatId), '');
+}
+
+function saveStoryOutline(chatId, text) {
+  storage.writeText(keyOf(STORAGE_KEYS.STORY_OUTLINE_PREFIX, chatId), text || '');
+}
+
+function loadWorldbookSourceConfig(chatId) {
+  return storage.readJson(keyOf(STORAGE_KEYS.WORLDBOOK_SOURCE_PREFIX, chatId), null);
+}
+
+function saveWorldbookSourceConfig(chatId, config) {
+  storage.writeJson(keyOf(STORAGE_KEYS.WORLDBOOK_SOURCE_PREFIX, chatId), config || {});
+}
+
 function loadEnabled() {
   return storage.readText(STORAGE_KEYS.ENABLED, 'true') !== 'false';
 }
@@ -72,6 +96,12 @@ export const poolService = {
   savePool,
   loadPreference,
   savePreference,
+  loadAiRules,
+  saveAiRules,
+  loadStoryOutline,
+  saveStoryOutline,
+  loadWorldbookSourceConfig,
+  saveWorldbookSourceConfig,
   loadEnabled,
   saveEnabled,
   loadDeletedHistory,
