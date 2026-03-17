@@ -4,7 +4,6 @@ import { consumeUserSendFlag, markUserSend, runtimeState } from './src/core/runt
 import { contextService } from './src/services/contextService.js';
 import { fetchAIGenerationModels, generateEventsByAI, generateEventsByAIWithStatus, testAIGenerationConnection } from './src/services/aiGenerationService.js';
 import { getPreciseExternalContext } from './src/services/dataSourceService.js';
-import { generateRuleBasedEvents } from './src/services/eventGeneratorService.js';
 import { buildInjectionPrompt, injectPromptToChat } from './src/services/injectionService.js';
 import { poolService } from './src/services/poolService.js';
 import { addAnchorLog } from './src/services/runtimeLogService.js';
@@ -79,9 +78,15 @@ async function generateIfPoolEmpty() {
   addAnchorLog('POOL_CHECK', '开始检查是否空池生成');
   const chatId = contextService.getChatId();
   const pool = poolService.loadPool(chatId);
+  if (pool.length >= RULES.POOL_MAX) {
+    addAnchorLog('POOL_SKIP_GENERATE', `pool=${pool.length}, reason=full`);
+    if (typeof toastr !== 'undefined') toastr.info('事件池已有5条，不继续生成', '随机事件池');
+    return;
+  }
+
   if (pool.length > 0) {
-    addAnchorLog('POOL_SKIP_GENERATE', `pool=${pool.length}`);
-    if (typeof toastr !== 'undefined') toastr.info('事件池非空，不补充', '随机事件池');
+    addAnchorLog('POOL_SKIP_GENERATE', `pool=${pool.length}, reason=non-empty`);
+    if (typeof toastr !== 'undefined') toastr.info('事件池为1-4条，按规则默认不生成', '随机事件池');
     return;
   }
 
@@ -95,8 +100,14 @@ async function generateIfPoolEmpty() {
     lastAi: aiText,
   };
 
-  const generatedByAi = await generateEventsByAI(source);
-  const generated = generatedByAi.length > 0 ? generatedByAi : generateRuleBasedEvents(source);
+  const aiResult = await generateEventsByAIWithStatus(source);
+  if (!aiResult.ok) {
+    addAnchorLog('AI_GENERATE_FAIL', `手动生成失败: ${aiResult.error}`);
+    if (typeof toastr !== 'undefined') toastr.warning(`不满足生成规则：${aiResult.error}`, '随机事件池');
+    return;
+  }
+
+  const generated = aiResult.events;
   addAnchorLog('POOL_GENERATED', `count=${generated.length}`);
 
   const deduped = poolService.dedupeByTitle(generated);
@@ -180,11 +191,10 @@ async function onPromptReady(eventData) {
       }
 
       if (!aiResult.ok) {
-        addAnchorLog('AI_FALLBACK', `AI失败，改用规则生成: ${aiResult.error}`);
+        addAnchorLog('AI_GENERATE_FAIL', `AI生成失败，本回合不新增事件: ${aiResult.error}`);
       }
 
-      const generatedByAi = aiResult.events;
-      const generated = generatedByAi.length > 0 ? generatedByAi : generateRuleBasedEvents(source);
+      const generated = aiResult.events;
       pool = poolService.dedupeByTitle(generated).output;
       addAnchorLog('POOL_FILLED', `count=${pool.length}`);
     }
@@ -197,14 +207,7 @@ async function onPromptReady(eventData) {
       return;
     }
 
-    const prompt = buildInjectionPrompt({
-      preference: poolService.loadPreference(chatId),
-      worldbook: external.worldbook,
-      outline: external.outline,
-      lastUser: userText,
-      lastAi: aiText,
-      pool,
-    });
+    const prompt = buildInjectionPrompt({ pool });
 
     injectPromptToChat(eventData, prompt);
     addAnchorLog('PROMPT_INJECTED', `pool=${pool.length}`);
